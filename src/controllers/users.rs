@@ -1,5 +1,5 @@
 use postgres::{ Client, NoTls };
-
+use bcrypt::{hash, DEFAULT_COST};
 use crate::responses::responses::NOT_FOUND;
 use crate::responses::responses::INTERNAL_SERVER_ERROR;
 use crate::responses::responses::OK_RESPONSE;
@@ -112,7 +112,10 @@ pub fn handle_post_signup(request: &str) -> (String, String) {
         Ok(signup_data) => {
             match Client::connect(DB_URL, NoTls) {
                 Ok(mut client) => {
-                    let hashed_password = hash_password(&signup_data.password); // Função para hash da senha
+                    let hashed_password = match hash(&signup_data.password, DEFAULT_COST) {
+                        Ok(hp) => hp,
+                        Err(_) => return (INTERNAL_SERVER_ERROR.to_string(), "Error hashing password".to_string()),
+                    };
 
                     let result = client.execute(
                         "INSERT INTO users (name, email, password) VALUES ($1, $2, $3)",
@@ -134,9 +137,9 @@ pub fn handle_post_signup(request: &str) -> (String, String) {
                         }
                     }
                 }
-                _ => (INTERNAL_SERVER_ERROR.to_string(), "Error connecting to database".to_string()),
+                Err(_) => (INTERNAL_SERVER_ERROR.to_string(), "Error connecting to database".to_string()),
             }
         }
-        _ => (INTERNAL_SERVER_ERROR.to_string(), "Error parsing signup data".to_string()),
+        Err(_) => (INTERNAL_SERVER_ERROR.to_string(), "Error parsing signup data".to_string()),
     }
 }
